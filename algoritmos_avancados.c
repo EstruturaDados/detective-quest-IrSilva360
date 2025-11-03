@@ -9,30 +9,35 @@
     #include <unistd.h> // Para sleep em sistemas UNIX/Linux
 #endif
 
-void limpaTela(); // Limpa o terminal (portável)
-void limpaBufferEntrada(); // Limpa buffer do teclado
-void pausa();
-void explorarSalas();
+// ESTRUTURAS
 
-//Estrutura de cada cômodo da mansão
+//Estrutura de cada cômodo da mansãos
 typedef struct Sala {
-    char nome[50];           // Nome da sala
-    struct Sala* esquerda;   // Caminho à esquerda
-    struct Sala* direita;    // Caminho à direita
+    char nome[50];
+    char pista[80]; // nova linha
+    struct Sala* esquerda;
+    struct Sala* direita;
 } Sala;
 
-//Cria dinamicamente uma sala com nome e sem conexões
-Sala* criarSala(const char* nome) {
-    Sala* novaSala = (Sala*) malloc(sizeof(Sala));
-    if (!novaSala) {
-        printf("Erro ao alocar memória!\n");
-        exit(1);
-    }
-    strcpy(novaSala->nome, nome);
-    novaSala->esquerda = NULL;
-    novaSala->direita = NULL;
-    return novaSala;
-}
+// Nó da BST para pistas
+typedef struct PistaNode {
+    char texto[80];
+    struct PistaNode* esquerda;
+    struct PistaNode* direita;
+} PistaNode;
+
+//PROTOTIPOS
+
+void limpaTela(); // Limpa o terminal (portável)
+void limpaBufferEntrada(); // Limpa buffer do teclado
+void pausa(int ms);
+Sala* criarSala(const char* nome, const char* pista); // agora recebe pista
+void explorarSalasComPistas(Sala* atual, PistaNode** arvorePistas);
+PistaNode* inserirPista(PistaNode* raiz, const char* texto);
+void exibirPistas(PistaNode* raiz);
+void liberarPistas(PistaNode* raiz);
+
+// FUNÇÃO PRINCIPAL ( MAIN )
 
 int main() {
 
@@ -43,15 +48,15 @@ int main() {
 #endif
 
     limpaTela();
+
     //Montagem do mapa da mansão (árvore fixa)
-
-    Sala* hallEntrada = criarSala("Hall de Entrada");
-    Sala* salaEstar   = criarSala("Sala de Estar");
-    Sala* biblioteca  = criarSala("Biblioteca");
-    Sala* cozinha     = criarSala("Cozinha");
-    Sala* jardim      = criarSala("Jardim");
-    Sala* sotao       = criarSala("Sótão");
-
+    Sala* hallEntrada = criarSala("Hall de Entrada", "Pegadas estranhas");
+    Sala* salaEstar = criarSala("Sala de Estar", "Copo quebrado no chão");
+    Sala* biblioteca = criarSala("Biblioteca", "Livro antigo fora do lugar");
+    Sala* cozinha = criarSala("Cozinha", "Faca faltando no suporte");
+    Sala* jardim = criarSala("Jardim", "Terra revirada");
+    Sala* sotao = criarSala("Sótão", "Baú com cadeado arrombado");
+    
     // Conexões da árvore (definição dos caminhos)
     hallEntrada->esquerda = salaEstar;
     hallEntrada->direita  = biblioteca;
@@ -61,11 +66,31 @@ int main() {
 
     biblioteca->direita = sotao;
 
-    //Início da exploração
+    // MENU PRINCIPAL
+    PistaNode* arvorePistas = NULL; // BST vazia
     printf("================================================\n");
-    printf(" DESAFIO DETETIVE QUEST - MANSÃO - NIVEL NOVATO\n");
+    printf(" DESAFIO DETETIVE QUEST - MANSÃO - NIVEL AVENTUREIRO\n");
     printf("================================================\n");
-    explorarSalas(hallEntrada);
+    explorarSalasComPistas(hallEntrada, &arvorePistas);
+
+    char opcao; {
+    printf("\nDeseja visualizar as pistas coletadas? (s/n): ");
+    scanf(" %c", &opcao);
+    limpaBufferEntrada();
+
+        if (opcao == 's' || opcao == 'S') {
+            printf("\n======= PISTAS COLETADAS =======\n");
+            exibirPistas(arvorePistas);
+        } else {
+        printf("\nOk! Fim da exploração.\n");
+
+        }
+
+        system("pause");
+        printf("\nFim de Jogo\n\nLiberando Memoria!!!!");
+        pausa(2000);
+        limpaTela();
+    }
 
     // Liberação da memória (boa prática)
     free(sotao);
@@ -74,11 +99,13 @@ int main() {
     free(biblioteca);
     free(salaEstar);
     free(hallEntrada);
+    liberarPistas(arvorePistas);
+
 
     return 0;
 }
 
-// Utilitários 
+// FUNÇÕES UTILITARIAS 
 
 // Limpa a tela 
 void limpaTela() {
@@ -103,21 +130,67 @@ void pausa(int ms) {
 #endif
 }
 
+// FUNÇÕES AUXILIARES
+
+//Cria dinamicamente uma sala com nome e sem conexões
+Sala* criarSala(const char* nome, const char* pista) {
+    Sala* novaSala = (Sala*) malloc(sizeof(Sala));
+    if (!novaSala) {
+        printf("Erro ao alocar memória!\n");
+        exit(1);
+    }
+    strcpy(novaSala->nome, nome);
+    if (pista != NULL)
+        strcpy(novaSala->pista, pista);
+    else
+        novaSala->pista[0] = '\0';
+    novaSala->esquerda = NULL;
+    novaSala->direita = NULL;
+    return novaSala;
+}
+
+PistaNode* inserirPista(PistaNode* raiz, const char* texto) {
+    if (raiz == NULL) {
+        PistaNode* novo = (PistaNode*) malloc(sizeof(PistaNode));
+        strcpy(novo->texto, texto);
+        novo->esquerda = NULL;
+        novo->direita = NULL;
+        return novo;
+    }
+    if (strcmp(texto, raiz->texto) < 0)
+        raiz->esquerda = inserirPista(raiz->esquerda, texto);
+    else if (strcmp(texto, raiz->texto) > 0)
+        raiz->direita = inserirPista(raiz->direita, texto);
+    // duplicados são ignorados
+    return raiz;
+}
+
+void exibirPistas(PistaNode* raiz) {
+    if (raiz == NULL) return;
+    exibirPistas(raiz->esquerda);
+    printf("%s\n\n", raiz->texto);
+    exibirPistas(raiz->direita);
+}
+
+void liberarPistas(PistaNode* raiz) {
+    if (!raiz) return;
+    liberarPistas(raiz->esquerda);
+    liberarPistas(raiz->direita);
+    free(raiz);
+}
+
+
 //Navegação interativa pela árvore
-void explorarSalas(Sala* atual) {
+void explorarSalasComPistas(Sala* atual, PistaNode** arvorePistas) {
     char escolha;
 
     while (atual != NULL) {
         printf("\nVocê está em: %s\n", atual->nome);
 
-        // Se for um nó-folha, terminou o caminho
-        if (atual->esquerda == NULL && atual->direita == NULL) {
-            printf("\nNão há mais caminhos! Fim da exploração!\n");
-            pausa(1500);
-            printf("\nLiberando Memoria!!!!");
-            pausa(1000);
-            limpaTela();
-            return;
+       // coleta automática de pista
+        if (strlen(atual->pista) > 0) {
+            printf("\nVocê encontrou uma pista: %s\n", atual->pista);
+            *arvorePistas = inserirPista(*arvorePistas, atual->pista);
         }
 
         printf("\nEscolha seu caminho:\n");
@@ -142,16 +215,16 @@ void explorarSalas(Sala* atual) {
         }
         else if (escolha == 's' || escolha == 'S') {
             printf("\nExploração encerrada pelo jogador!\n");
-            pausa(1500);
-            printf("\nLiberando Memoria!!!!");
-            pausa(1500);
-            limpaTela();
             return;
         }
         else {
             printf("\nOpção inválida! Tente Novamente!\n");
         }
+
+           
     }
+
+    
 }
 
 
